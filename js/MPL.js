@@ -15,6 +15,8 @@ var MPL = (function (FormulaParser) {
 
   var variableKey = 'prop';
 
+  /*TODO: Ajouter opérateurs de logique épistémique (connaissance commune, distribuée, tout le monde sait que) */
+  
   var unaries = [
     { symbol: '~',  key: 'neg',  precedence: 4 },
     { symbol: '[]', key: 'nec',  precedence: 4 },
@@ -142,41 +144,47 @@ var MPL = (function (FormulaParser) {
     // Array of states (worlds) in model.
     // Each state is an object with two properties:
     // - assignment: a truth assignment (in which only true values are actually stored)
-    // - successors: an array of successor state indices (in lieu of a separate accessibility relation)
-    // ex: [{assignment: {},          successors: [0,1]},
-    //      {assignment: {'p': true}, successors: []   }]
+    // - successors: an array of successor state indices for each agent (in lieu of a separate accessibility relation)
+    // ex: [{assignment: {},          successors: {'a': [0,1]}},
+    //      {assignment: {'p': true}, successors: {}   }]
     var _states = [];
 
     /**
-     * Adds a transition to the model, given source and target state indices.
+     * Adds a transition to the model, given source and target state indices and corresponding agent.
      */
-    this.addTransition = function (source, target) {
+    this.addTransition = function (source, target, agent) {
       if (!_states[source] || !_states[target]) return;
 
-      var successors = _states[source].successors,
-          index = successors.indexOf(target);
+      var successors = _states[source].successors[agent], 
+          index = successors.indexOf(target); /*successors is a set but there is an array associated to each agent so this works*/
       if (index === -1) successors.push(target);
     };
 
     /**
-     * Removes a transition from the model, given source and target state indices.
+     * Removes a transition from the model, given source, target state indices and corresponding agent.
      */
-    this.removeTransition = function (source, target) {
+    this.removeTransition = function (source, target, agent) {
       if (!_states[source]) return;
 
-      var successors = _states[source].successors,
-          index = successors.indexOf(target);
+      var successors = _states[source].successors[agent],
+          index = successors.indexOf(target); /*successors is a set but there is an array associated to each agent so this works*/
       if (index !== -1) successors.splice(index, 1);
     };
 
     /**
-     * Returns an array of successor states for a given state index.
+     * Returns an array of successor states for a given state index and corresponding agent.
      */
-    this.getSuccessorsOf = function (source) {
+    this.getSuccessorsOf = function (source,agent) {
       if (!_states[source]) return undefined;
 
-      return _states[source].successors;
+      return _states[source].successors[agent];
     };
+
+    this.getAgents= function (source) {
+      if (!_states[source]) return;
+
+      return _states[source].successors.keys();
+    }
 
     /**
      * Adds a state with a given assignment to the model.
@@ -187,7 +195,7 @@ var MPL = (function (FormulaParser) {
         if (assignment[propvar] === true)
           processedAssignment[propvar] = assignment[propvar];
 
-      _states.push({assignment: processedAssignment, successors: []});
+      _states.push({assignment: processedAssignment, successors: {}}); /*changed successors type from list to set*/
     };
 
     /**
@@ -210,8 +218,8 @@ var MPL = (function (FormulaParser) {
       var self = this;
 
       _states[state] = null;
-      _states.forEach(function (source, index) {
-        if (source) self.removeTransition(index, state);
+      _states.forEach(function (source, index, agent) {
+        if (source) self.removeTransition(index, state, agent);
       });
     };
 
@@ -240,8 +248,8 @@ var MPL = (function (FormulaParser) {
 
     /**
      * Returns current model as a compact string suitable for use as a URL parameter.
-     * ex: [{assignment: {'q': true}, successors: [0,2]}, null, {assignment: {}, successors: []}]
-     *     compresses to 'AqS0,2;;AS;'
+     * ex: [{assignment: {'q': true}, successors: {'a' : [0,2]}}, null, {assignment: {}, successors: {}}]
+     *     compresses to 'AqSa0,2;;AS;'
      */
     this.getModelString = function () {
       var modelString = '';
@@ -249,7 +257,12 @@ var MPL = (function (FormulaParser) {
       _states.forEach(function (state) {
         if (state) {
           modelString += 'A' + Object.keys(state.assignment).join();
-          modelString += 'S' + state.successors.join();
+          modelString += 'S';
+          if (state.successors !== {}){
+            for (var agent in state.successors) {
+              modelString += agent + state.successors[agent].join();
+            }
+          }
         }
         modelString += ';';
       });
@@ -259,7 +272,8 @@ var MPL = (function (FormulaParser) {
 
     /**
      * Restores a model from a given model string.
-     */
+     
+     TODO: Finir de changer la restauration depuis un string*/
     this.loadFromModelString = function (modelString) {
       var regex = /^(?:;|(?:A|A(?:\w+,)*\w+)(?:S|S(?:\d+,)*\d+);)+$/;
       if (!regex.test(modelString)) return;
@@ -283,7 +297,7 @@ var MPL = (function (FormulaParser) {
 
         var assignment = {};
         stateProperties[0].forEach(function (propvar) { assignment[propvar] = true; });
-        _states.push({assignment: assignment, successors: []});
+        _states.push({assignment: assignment, successors: {}});
 
         var successors = stateProperties[1].map(function (succState) { return +succState; });
         successorLists.push(successors);
@@ -292,9 +306,9 @@ var MPL = (function (FormulaParser) {
       // restore transitions
       successorLists.forEach(function (successors, source) {
         if (!successors) return;
-
+        /*TODO: Ajouter un foreach sur les agents*/
         successors.forEach(function (target) {
-          self.addTransition(source, target);
+          self.addTransition(source, target, agent);
         });
       });
     };

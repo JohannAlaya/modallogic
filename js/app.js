@@ -50,26 +50,31 @@ states.forEach(function(state) {
 // --> links setup
 nodes.forEach(function(source) {
   var sourceId = source.id,
-      successors = model.getSuccessorsOf(sourceId);
+      agents = model.getAgents(sourceId);    
 
-  successors.forEach(function(targetId) {
-    if(sourceId === targetId) {
-      source.reflexive = true;
-      return;
-    }
+  agents.forEach(function(agent){ 
+    successors = model.getSuccessorsOf(sourceId,agent); /*Getting the successors for each agent*/
 
-    var target = nodes.filter(function(node) { return node.id === targetId; })[0];
-
-    if(sourceId < targetId) {
-      links.push({source: source, target: target, left: false, right: true });
-      return;
-    }
-
-    var link = links.filter(function(l) { return (l.source === target && l.target === source); })[0];
-
-    if(link) link.left = true;
-    else links.push({source: target, target: source, left: true, right: false });
-  });
+    successors.forEach(function(targetId) {
+      if(sourceId === targetId) {
+        source.reflexive = true;
+        return;
+      }
+  
+      var target = nodes.filter(function(node) { return node.id === targetId; })[0]; /*Getting the target node*/
+  
+      if(sourceId < targetId) {
+        links.push({source: source, target: target, left: false, right: true, agent: agent }); /*Added agent
+        in the values of the link */
+        return;
+      }
+  
+      var link = links.filter(function(l) { return (l.source === target && l.target === source); })[0];
+  
+      if(link) link.left = true;
+      else links.push({source: target, target: source, left: true, right: false, agent: agent });
+    });
+  });  
 });
 
 // set up SVG for D3
@@ -417,6 +422,7 @@ function restart() {
 
       // add link to graph (update if exists)
       // note: links are strictly source < target; arrows separately specified by booleans
+      // TODO : Changer cette partie pour que l'ajout de nouveaux liens demande un agent 
       var source, target, direction;
       if(mousedown_node.id < mouseup_node.id) {
         source = mousedown_node;
