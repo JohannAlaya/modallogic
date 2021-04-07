@@ -155,9 +155,13 @@ var MPL = (function (FormulaParser) {
     this.addTransition = function (source, target, agent) {
       if (!_states[source] || !_states[target]) return;
 
-      var successors = _states[source].successors[agent], 
-          index = successors.indexOf(target); /*successors is a set but there is an array associated to each agent so this works*/
-      if (index === -1) successors.push(target);
+      var s = _states[source].successors;
+      if (s.has(agent)){
+        var L = s.get(agent);
+        L.push(target);
+        s.set(agent, L);
+      }
+      else s.set(agent, [target]);
     };
 
     /**
@@ -166,15 +170,26 @@ var MPL = (function (FormulaParser) {
     this.removeTransition = function (source, target, agent) {
       if (!_states[source]) return;
 
-      var successors = _states[source].successors[agent],
-          index = successors.indexOf(target); /*successors is a set but there is an array associated to each agent so this works*/
-      if (index !== -1) successors.splice(index, 1);
+      var successors = _states[source].successors;
+      if (s.has(agent)){
+        var L = s.get(agent);
+        var index = L.indexOf(target);
+        if (index !== -1) L.splice(index, 1);
+        s.set(agent,L);
+      }
     };
 
     /**
      * Returns an array of successor states for a given state index and corresponding agent.
      */
     this.getSuccessorsOf = function (source,agent) {
+      if (!_states[source]) return undefined;
+
+      return _states[source].successors.get(agent);
+    };
+
+    //TODO//
+    this.getSuccessorsOfOld = function (source) {
       if (!_states[source]) return undefined;
 
       return _states[source].successors[agent];
@@ -195,7 +210,7 @@ var MPL = (function (FormulaParser) {
         if (assignment[propvar] === true)
           processedAssignment[propvar] = assignment[propvar];
 
-      _states.push({assignment: processedAssignment, successors: {}}); /*changed successors type from list to set*/
+      _states.push({assignment: processedAssignment, successors: new Map([])}); /*changed successors type from list to map*/
     };
 
     /**
@@ -317,6 +332,7 @@ var MPL = (function (FormulaParser) {
   /**
    * Evaluate the truth of an MPL wff (in JSON representation) at a given state within a given model.
    * @private
+   * TODO: Finir d'implémenter les fonctions de logique épistémique 
    */
   function _truth(model, state, json) {
     if (json.prop)

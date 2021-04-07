@@ -24,7 +24,8 @@ var model = new MPL.Model(),
 var modelParam = window.location.search.match(/\?model=(.*)/);
 if(modelParam) modelString = modelParam[1];
 
-model.loadFromModelString(modelString);
+//TODO : Finir le regex pour que cette partie ne bloque pas l'app
+// model.loadFromModelString(modelString);
 
 // set up initial nodes and links (edges) of graph, based on MPL model
 var lastNodeId = -1,
@@ -49,8 +50,8 @@ states.forEach(function(state) {
 
 // --> links setup
 nodes.forEach(function(source) {
-  var sourceId = source.id,
-      agents = model.getAgents(sourceId);    
+  var sourceId = source.id;
+  var agents = model.getAgents(sourceId);
 
   agents.forEach(function(agent){ 
     successors = model.getSuccessorsOf(sourceId,agent); /*Getting the successors for each agent*/
@@ -332,12 +333,13 @@ function restart() {
   // path (link) group
   path = path.data(links);
 
-  // update existing links
+  // update existing links 
   path.classed('selected', function(d) { return d === selected_link; })
     .style('marker-start', function(d) { return d.left ? 'url(#start-arrow)' : ''; })
     .style('marker-end', function(d) { return d.right ? 'url(#end-arrow)' : ''; });
 
-  // add new links
+  // add new links TODO: Ajouter les agents au dessus de la fleche des liens
+
   path.enter().append('svg:path')
     .attr('class', 'link')
     .classed('selected', function(d) { return d === selected_link; })
@@ -353,6 +355,11 @@ function restart() {
       setSelectedNode(null);
       restart();
     });
+  
+  path.append('svg:text')
+  .attr('x', 0)
+  .attr('y', 4)
+  .text(function(d) {return d.agent});
 
   // remove old links
   path.exit().remove();
@@ -417,12 +424,15 @@ function restart() {
       // unenlarge target node
       d3.select(this).attr('transform', '');
 
+      // ask for agent TODO: le faire de maniere plus elegante
+      var newAgent = prompt("Quel est l'agent associé à cette transition ?", "");
+
       // add transition to model
-      model.addTransition(mousedown_node.id, mouseup_node.id);
+      model.addTransition(mousedown_node.id, mouseup_node.id, newAgent);
 
       // add link to graph (update if exists)
       // note: links are strictly source < target; arrows separately specified by booleans
-      // TODO : Changer cette partie pour que l'ajout de nouveaux liens demande un agent 
+      // TODO : Changer cette partie pour que l'ajout de nouveaux liens demande un agent DONE?
       var source, target, direction;
       if(mousedown_node.id < mouseup_node.id) {
         source = mousedown_node;
@@ -441,7 +451,7 @@ function restart() {
       if(link) {
         link[direction] = true;
       } else {
-        link = {source: source, target: target, left: false, right: false};
+        link = {source: source, target: target, left: false, right: false, agent: newAgent};
         link[direction] = true;
         links.push(link);
       }
@@ -529,12 +539,13 @@ function mouseup() {
 function removeLinkFromModel(link) {
   var sourceId = link.source.id,
       targetId = link.target.id;
+      agent = link.agent;
 
   // remove leftward transition
-  if(link.left) model.removeTransition(targetId, sourceId);
+  if(link.left) model.removeTransition(targetId, sourceId, agent);
 
   // remove rightward transition
-  if(link.right) model.removeTransition(sourceId, targetId);
+  if(link.right) model.removeTransition(sourceId, targetId, agent);
 }
 
 function spliceLinksForNode(node) {
@@ -581,15 +592,16 @@ function keydown() {
     case 66: // B
       if(selected_link) {
         var sourceId = selected_link.source.id,
-            targetId = selected_link.target.id;
+            targetId = selected_link.target.id,
+            agent = selected_link.agent;
         // set link direction to both left and right
         if(!selected_link.left) {
           selected_link.left = true;
-          model.addTransition(targetId, sourceId);
+          model.addTransition(targetId, sourceId, agent);
         }
         if(!selected_link.right) {
           selected_link.right = true;
-          model.addTransition(sourceId, targetId);
+          model.addTransition(sourceId, targetId, agent);
         }
       }
       restart();
@@ -597,15 +609,16 @@ function keydown() {
     case 76: // L
       if(selected_link) {
         var sourceId = selected_link.source.id,
-            targetId = selected_link.target.id;
+            targetId = selected_link.target.id,
+            agent = selected_link.agent;
         // set link direction to left only
         if(!selected_link.left) {
           selected_link.left = true;
-          model.addTransition(targetId, sourceId);
+          model.addTransition(targetId, sourceId, agent);
         }
         if(selected_link.right) {
           selected_link.right = false;
-          model.removeTransition(sourceId, targetId);
+          model.removeTransition(sourceId, targetId, agent);
         }
       }
       restart();
@@ -622,15 +635,16 @@ function keydown() {
         }
       } else if(selected_link) {
         var sourceId = selected_link.source.id,
-            targetId = selected_link.target.id;
+            targetId = selected_link.target.id,
+            agent = selected_link.agent;
         // set link direction to right only
         if(selected_link.left) {
           selected_link.left = false;
-          model.removeTransition(targetId, sourceId);
+          model.removeTransition(targetId, sourceId, agent);
         }
         if(!selected_link.right) {
           selected_link.right = true;
-          model.addTransition(sourceId, targetId);
+          model.addTransition(sourceId, targetId, agent);
         }
       }
       restart();
