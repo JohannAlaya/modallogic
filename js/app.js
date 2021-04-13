@@ -65,6 +65,7 @@ nodes.forEach(function(source) {
       var target = nodes.filter(function(node) { return node.id === targetId; })[0]; /*Getting the target node*/
   
       if(sourceId < targetId) {
+        //TODO: Ajouter un test pour vérifier les duplicatas d'agents//
         links.push({source: source, target: target, left: false, right: true, agent: agent }); /*Added agent
         in the values of the link */
         return;
@@ -182,10 +183,12 @@ function evaluateFormula() {
   }
 
   // check formula for bad vars
-  var varsInUse = propvars.slice(0, varCount);
+  var varsInUse = propvars.slice(0, varCount).concat(model.getAllAgents());
+
   var badVars = (formula.match(/\w+/g) || []).filter(function(v) {
     return varsInUse.indexOf(v) === -1;
   });
+  console.log(badVars);
   if(badVars.length) {
     evalOutput
       .html('<div class="alert">Invalid variables in formula!</div>')
@@ -359,7 +362,7 @@ function restart() {
   path.append('svg:text')
   .attr('x', 0)
   .attr('y', 4)
-  .text(function(d) {return d.agent});
+  .text("test");
 
   // remove old links
   path.exit().remove();
@@ -425,10 +428,10 @@ function restart() {
       d3.select(this).attr('transform', '');
 
       // ask for agent TODO: le faire de maniere plus elegante
-      var newAgent = prompt("Quel est l'agent associé à cette transition ?", "");
-
+      var newAgents = prompt("Quel sont les agents associés à cette transition ? (sans espaces, séparés par une virgule, ex: a,b,c)", "");
+      var agentList = newAgents.split(',')
       // add transition to model
-      model.addTransition(mousedown_node.id, mouseup_node.id, newAgent);
+      model.addTransition(mousedown_node.id, mouseup_node.id, agentList);
 
       // add link to graph (update if exists)
       // note: links are strictly source < target; arrows separately specified by booleans
@@ -451,7 +454,7 @@ function restart() {
       if(link) {
         link[direction] = true;
       } else {
-        link = {source: source, target: target, left: false, right: false, agent: newAgent};
+        link = {source: source, target: target, left: false, right: false, agent: agentList};
         link[direction] = true;
         links.push(link);
       }

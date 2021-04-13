@@ -27,7 +27,8 @@ var MPL = (function (FormulaParser) {
     { symbol: '&',   key: 'conj', precedence: 3, associativity: 'right' },
     { symbol: '|',   key: 'disj', precedence: 2, associativity: 'right' },
     { symbol: '->',  key: 'impl', precedence: 1, associativity: 'right' },
-    { symbol: '<->', key: 'equi', precedence: 0, associativity: 'right' }
+    { symbol: '<->', key: 'equi', precedence: 0, associativity: 'right' },
+    { symbol: '?', key: 'know', precedence: 0, associativity: 'right'}
   ];
 
   var MPLParser = new FormulaParser(variableKey, unaries, binaries);
@@ -62,12 +63,15 @@ var MPL = (function (FormulaParser) {
       return '(' + _jsonToASCII(json.impl[0]) + ' -> ' + _jsonToASCII(json.impl[1]) + ')';
     else if (json.equi && json.equi.length === 2)
       return '(' + _jsonToASCII(json.equi[0]) + ' <-> ' + _jsonToASCII(json.equi[1]) + ')';
+    else if (json.know && json.know.length === 2)
+      return '(' + _jsonToASCII(json.know[0]) + ' ? ' + _jsonToASCII(json.know[1]) + ')';
     else
       throw new Error('Invalid JSON for formula!');
   }
 
   /**
    * Converts an MPL wff from ASCII to LaTeX.
+   * TODO: updater cette partie
    * @private
    */
   function _asciiToLaTeX(ascii) {
@@ -82,6 +86,7 @@ var MPL = (function (FormulaParser) {
 
   /**
    * Converts an MPL wff from ASCII to Unicode.
+   * TODO: Updater cette partie
    * @private
    */
   function _asciiToUnicode(ascii) {
@@ -188,17 +193,30 @@ var MPL = (function (FormulaParser) {
       return _states[source].successors.get(agent);
     };
 
-    //TODO//
+    //TODO: verifier si ca marche//
     this.getSuccessorsOfOld = function (source) {
       if (!_states[source]) return undefined;
 
-      return _states[source].successors[agent];
+      return _states[source].successors.values();
     };
 
     this.getAgents= function (source) {
       if (!_states[source]) return;
 
       return _states[source].successors.keys();
+    }
+
+    this.getAllAgents= function(){
+      var L = [];
+      _states.forEach(function (state) {
+        if (state) {
+          var g = state.successors
+          g.forEach (function (value, key, map) {
+            if (L.indexOf(key) === -1) { L.push(key);}
+          })
+        }
+      })
+      return L[0];
     }
 
     /**
@@ -348,9 +366,12 @@ var MPL = (function (FormulaParser) {
     else if (json.equi)
       return (_truth(model, state, json.equi[0]) === _truth(model, state, json.equi[1]));
     else if (json.nec)
-      return model.getSuccessorsOf(state).every(function (succState) { return _truth(model, succState, json.nec); });
+      return model.getSuccessorsOfOld(state).every(function (succState) { return _truth(model, succState, json.nec); });
     else if (json.poss)
-      return model.getSuccessorsOf(state).some(function (succState) { return _truth(model, succState, json.poss); });
+      return model.getSuccessorsOfOld(state).some(function (succState) { return _truth(model, succState, json.poss); });
+    else if (json.know){
+      return model.getSuccessorsOf(state, json.know[0]).every(function (succState) { return _truth(model, succState, json.know[1]); });
+    }
     else
       throw new Error('Invalid formula!');
   }
