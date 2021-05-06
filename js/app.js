@@ -184,11 +184,9 @@ function evaluateFormula() {
 
   // check formula for bad vars
   var varsInUse = propvars.slice(0, varCount).concat(model.getAllAgents());
-
   var badVars = (formula.match(/\w+/g) || []).filter(function(v) {
     return varsInUse.indexOf(v) === -1;
   });
-  console.log(badVars);
   if(badVars.length) {
     evalOutput
       .html('<div class="alert">Invalid variables in formula!</div>')

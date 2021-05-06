@@ -18,17 +18,21 @@ var MPL = (function (FormulaParser) {
   /*TODO: Ajouter opérateurs de logique épistémique (connaissance commune, distribuée, tout le monde sait que) */
   
   var unaries = [
-    { symbol: '~',  key: 'neg',  precedence: 4 },
-    { symbol: '[]', key: 'nec',  precedence: 4 },
-    { symbol: '<>', key: 'poss', precedence: 4 }
+    { symbol: '~',  key: 'neg',  precedence: 6 },
+    { symbol: '[]', key: 'nec',  precedence: 6 },
+    { symbol: '<>', key: 'poss', precedence: 6 }
   ];
 
   var binaries = [
-    { symbol: '&',   key: 'conj', precedence: 3, associativity: 'right' },
-    { symbol: '|',   key: 'disj', precedence: 2, associativity: 'right' },
-    { symbol: '->',  key: 'impl', precedence: 1, associativity: 'right' },
-    { symbol: '<->', key: 'equi', precedence: 0, associativity: 'right' },
-    { symbol: '?', key: 'know', precedence: 0, associativity: 'right'}
+    { symbol: '&',   key: 'conj', precedence: 5, associativity: 'right' },
+    { symbol: '|',   key: 'disj', precedence: 4, associativity: 'right' },
+    { symbol: '->',  key: 'impl', precedence: 3, associativity: 'right' },
+    { symbol: '<->', key: 'equi', precedence: 2, associativity: 'right' },
+    { symbol: '?', key: 'know', precedence: 2, associativity: 'right' },
+    { symbol: ',', key: 'group', precedence: 1, associativity: 'right' },
+    //TODO : Connaissance commune, connaissance distribuée
+    { symbol: '#', key: 'eknow', precedence: 0, associativity: 'right' },
+    { symbol: '/', key: 'distrib', precedence: 0, associativity: 'right'}
   ];
 
   var MPLParser = new FormulaParser(variableKey, unaries, binaries);
@@ -44,6 +48,7 @@ var MPL = (function (FormulaParser) {
 
   /**
    * Converts an MPL wff from JSON to ASCII.
+   * TODO: Ajouter un transformation ascii pour les groupes et connaissance commune
    * @private
    */
   function _jsonToASCII(json) {
@@ -65,6 +70,15 @@ var MPL = (function (FormulaParser) {
       return '(' + _jsonToASCII(json.equi[0]) + ' <-> ' + _jsonToASCII(json.equi[1]) + ')';
     else if (json.know && json.know.length === 2)
       return '(' + _jsonToASCII(json.know[0]) + ' ? ' + _jsonToASCII(json.know[1]) + ')';
+    else if (json.group && json.group.length === 2) {
+      return _jsonToASCII(json.group[0]) + ' , ' + _jsonToASCII(json.group[1]);
+    }
+    else if (json.eknow && json.eknow.length === 2) {
+      return '(' + _jsonToASCII(json.eknow[0]) + ' # ' + _jsonToASCII(json.eknow[1]) + ')';
+    }
+    else if (json.distrib && json.distrib.length === 2) {
+      return '(' + _jsonToASCII(json.distrib[0]) + ' / ' + _jsonToASCII(json.distrib[1]) + ')';
+    }
     else
       throw new Error('Invalid JSON for formula!');
   }
@@ -157,16 +171,18 @@ var MPL = (function (FormulaParser) {
     /**
      * Adds a transition to the model, given source and target state indices and corresponding agent.
      */
-    this.addTransition = function (source, target, agent) {
+    this.addTransition = function (source, target, agentList) {
       if (!_states[source] || !_states[target]) return;
 
       var s = _states[source].successors;
-      if (s.has(agent)){
-        var L = s.get(agent);
-        L.push(target);
-        s.set(agent, L);
-      }
-      else s.set(agent, [target]);
+      agentList.forEach(function (agent){
+        if (s.has(agent)){
+          var L = s.get(agent);
+          L.push(target);
+          s.set(agent, L);
+        }
+        else s.set(agent, [target]);
+      })
     };
 
     /**
@@ -189,7 +205,6 @@ var MPL = (function (FormulaParser) {
      */
     this.getSuccessorsOf = function (source,agent) {
       if (!_states[source]) return undefined;
-
       return _states[source].successors.get(agent);
     };
 
@@ -216,7 +231,7 @@ var MPL = (function (FormulaParser) {
           })
         }
       })
-      return L[0];
+      return L;
     }
 
     /**
@@ -352,6 +367,7 @@ var MPL = (function (FormulaParser) {
    * @private
    * TODO: Finir d'implémenter les fonctions de logique épistémique 
    */
+
   function _truth(model, state, json) {
     if (json.prop)
       return model.valuation(json.prop, state);
@@ -365,12 +381,52 @@ var MPL = (function (FormulaParser) {
       return (!_truth(model, state, json.impl[0]) || _truth(model, state, json.impl[1]));
     else if (json.equi)
       return (_truth(model, state, json.equi[0]) === _truth(model, state, json.equi[1]));
-    else if (json.nec)
-      return model.getSuccessorsOfOld(state).every(function (succState) { return _truth(model, succState, json.nec); });
-    else if (json.poss)
-      return model.getSuccessorsOfOld(state).some(function (succState) { return _truth(model, succState, json.poss); });
+    else if (json.nec) {
+      var L = Array.from(model.getSuccessorsOfOld(state));
+      return L.every(function (succState) { return _truth(model, succState, json.nec); });
+    }
+    else if (json.poss){
+      var L = Array.from(model.getSuccessorsOfOld(state));
+      return L.some(function (succState) { return _truth(model, succState, json.poss); });
+    }
     else if (json.know){
-      return model.getSuccessorsOf(state, json.know[0]).every(function (succState) { return _truth(model, succState, json.know[1]); });
+      //todo : reflexivite
+      var a = model.getSuccessorsOf(state, json.know[0].prop);
+      if (a === undefined){ return true;}
+      else return model.getSuccessorsOf(state, json.know[0].prop).every(function (succState) { return _truth(model, succState, json.know[1]); });
+    }
+    else if (json.group){
+      var g = json.group;
+      var a;
+      var L = [];
+      while(g){
+        a = g[0];
+        if(L.indexOf(a) === -1) {L.push(a);}
+        if(g[1].prop) {L.push(g[1])};
+        g=g[1].group;
+      }
+      return L;
+    }
+    else if (json.eknow){
+      var L = _truth(model, state, json.eknow[0]);
+      if (L instanceof Array) {
+        return L.every(function (agent) { var a = {know: [agent, json.eknow[1]]}; return _truth(model, state, a);});
+      }
+      else return undefined;
+    }
+    else if (json.distrib){
+      var L = _truth(model, state, json.distrib[0]);
+      if (L instanceof Array) {
+       var A = [];
+       L.forEach(function (agent) {A.push(model.getSuccessorsOf(state, agent.prop));});
+       console.log(A);
+       if (A.includes(undefined)) {var B = undefined;}
+       else {var B = A[0];
+        A.forEach(function (array) {B.filter(x => array.includes(x));});}
+       if (B === undefined) {return true;} //Todo: Reflexivite
+       else {return B.every(function (state) {return _truth(model, state, json.distrib[1]);});}
+      }
+      else return undefined;
     }
     else
       throw new Error('Invalid formula!');
