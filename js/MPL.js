@@ -32,7 +32,8 @@ var MPL = (function (FormulaParser) {
     { symbol: ',', key: 'group', precedence: 1, associativity: 'right' },
     //TODO : Connaissance commune, connaissance distribuée
     { symbol: '#', key: 'eknow', precedence: 0, associativity: 'right' },
-    { symbol: '/', key: 'distrib', precedence: 0, associativity: 'right'}
+    { symbol: '/', key: 'distrib', precedence: 0, associativity: 'right'},
+    { symbol: '§', key: 'common', precedence: 0, associativity: 'right'}
   ];
 
   var MPLParser = new FormulaParser(variableKey, unaries, binaries);
@@ -78,6 +79,9 @@ var MPL = (function (FormulaParser) {
     }
     else if (json.distrib && json.distrib.length === 2) {
       return '(' + _jsonToASCII(json.distrib[0]) + ' / ' + _jsonToASCII(json.distrib[1]) + ')';
+    }
+    else if (json.common && json.common.length === 2) {
+      return '(' + _jsonToASCII(json.common[0]) + ' § ' + _jsonToASCII(json.common[1]) + ')';
     }
     else
       throw new Error('Invalid JSON for formula!');
@@ -285,6 +289,42 @@ var MPL = (function (FormulaParser) {
       return stateList;
     };
 
+    this.getAllSuccessorsOf= function(state, agent) {
+      var V = [];
+      var C = model.getSuccessorsOf(state, agent);
+      if(typeof C !== "undefined"){
+        C=Array.from(C); //On fait un shallow copy de C
+        while(C[0]){
+          var s = C[0];
+          if (!V.includes(s)){
+            var L = model.getSuccessorsOf(s, agent);
+            if(L !== undefined){
+              L.forEach(function (x) {C.push(x);})
+            }
+            V.push(s);
+          }
+          C.shift();
+        }
+     }
+      return V;
+    }
+
+    this.gAccessibility= function(state, list) {
+      var S = [];
+      var F = [];
+      list.forEach(function (agent){
+        S.push(model.getAllSuccessorsOf(state, agent.prop));
+      });
+      S.forEach(function (array){
+        array.forEach(function (s) {
+          if(F.indexOf(s) === -1) {
+            F.push(s);
+          }
+        })
+      })
+      return F;
+    }
+
     /**
      * Returns the truth value of a given propositional variable at a given state index.
      */
@@ -419,12 +459,21 @@ var MPL = (function (FormulaParser) {
       if (L instanceof Array) {
        var A = [];
        L.forEach(function (agent) {A.push(model.getSuccessorsOf(state, agent.prop));});
+       //TODO: En fait il faut que ca se propage dans tous les chemins non ?
        console.log(A);
        if (A.includes(undefined)) {var B = undefined;}
        else {var B = A[0];
         A.forEach(function (array) {B.filter(x => array.includes(x));});}
        if (B === undefined) {return true;} //Todo: Reflexivite
        else {return B.every(function (state) {return _truth(model, state, json.distrib[1]);});}
+      }
+      else return undefined;
+    }
+    else if (json.common){
+      var L = _truth(model, state, json.common[0]);
+      if (L instanceof Array) {
+        var G = model.gAccessibility(state, L);
+        return G.every(function (s) {return _truth(model, s, json.common[1]);});
       }
       else return undefined;
     }
