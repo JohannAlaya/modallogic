@@ -14,8 +14,6 @@ var MPL = (function (FormulaParser) {
   if (typeof FormulaParser === 'undefined') throw new Error('MPL could not find dependency: formula-parser');
 
   var variableKey = 'prop';
-
-  /*TODO: Ajouter opérateurs de logique épistémique (connaissance commune, distribuée, tout le monde sait que) */
   
   var unaries = [
     { symbol: '~',  key: 'neg',  precedence: 6 },
@@ -30,7 +28,6 @@ var MPL = (function (FormulaParser) {
     { symbol: '<->', key: 'equi', precedence: 2, associativity: 'right' },
     { symbol: '?', key: 'know', precedence: 2, associativity: 'right' },
     { symbol: ',', key: 'group', precedence: 1, associativity: 'right' },
-    //TODO : Connaissance commune, connaissance distribuée
     { symbol: '#', key: 'eknow', precedence: 0, associativity: 'right' },
     { symbol: '/', key: 'distrib', precedence: 0, associativity: 'right'},
     { symbol: '§', key: 'common', precedence: 0, associativity: 'right'}
@@ -49,7 +46,6 @@ var MPL = (function (FormulaParser) {
 
   /**
    * Converts an MPL wff from JSON to ASCII.
-   * TODO: Ajouter un transformation ascii pour les groupes et connaissance commune
    * @private
    */
   function _jsonToASCII(json) {
@@ -89,7 +85,6 @@ var MPL = (function (FormulaParser) {
 
   /**
    * Converts an MPL wff from ASCII to LaTeX.
-   * TODO: updater cette partie
    * @private
    */
   function _asciiToLaTeX(ascii) {
@@ -104,7 +99,6 @@ var MPL = (function (FormulaParser) {
 
   /**
    * Converts an MPL wff from ASCII to Unicode.
-   * TODO: Updater cette partie
    * @private
    */
   function _asciiToUnicode(ascii) {
@@ -192,16 +186,18 @@ var MPL = (function (FormulaParser) {
     /**
      * Removes a transition from the model, given source, target state indices and corresponding agent.
      */
-    this.removeTransition = function (source, target, agent) {
+    this.removeTransition = function (source, target, agentList) {
       if (!_states[source]) return;
 
-      var successors = _states[source].successors;
-      if (s.has(agent)){
-        var L = s.get(agent);
-        var index = L.indexOf(target);
-        if (index !== -1) L.splice(index, 1);
-        s.set(agent,L);
-      }
+      var s = _states[source].successors;
+      agentList.forEach(function (agent){
+        if (s.has(agent)){
+          var L = s.get(agent);
+          var index = L.indexOf(target);
+          if (index !== -1) L.splice(index, 1);
+         s.set(agent,L);
+        }
+      })
     };
 
     /**
@@ -212,7 +208,6 @@ var MPL = (function (FormulaParser) {
       return _states[source].successors.get(agent);
     };
 
-    //TODO: verifier si ca marche//
     this.getSuccessorsOfOld = function (source) {
       if (!_states[source]) return undefined;
 
@@ -325,6 +320,18 @@ var MPL = (function (FormulaParser) {
       return F;
     }
 
+    this.gAccessStrict= function(state, list) {
+      var S = [];
+      list.forEach(function (agent){
+        S.push(model.getAllSuccessorsOf(state, agent.prop));
+      });
+      var F = S[0];
+      S.forEach(function (array){
+        F = F.filter(s => array.includes(s)); //intersection de S[0] et de des chemins de tous les autres agents
+      })
+      return F;
+    }
+
     /**
      * Returns the truth value of a given propositional variable at a given state index.
      */
@@ -405,7 +412,6 @@ var MPL = (function (FormulaParser) {
   /**
    * Evaluate the truth of an MPL wff (in JSON representation) at a given state within a given model.
    * @private
-   * TODO: Finir d'implémenter les fonctions de logique épistémique 
    */
 
   function _truth(model, state, json) {
@@ -423,17 +429,19 @@ var MPL = (function (FormulaParser) {
       return (_truth(model, state, json.equi[0]) === _truth(model, state, json.equi[1]));
     else if (json.nec) {
       var L = Array.from(model.getSuccessorsOfOld(state));
-      return L.every(function (succState) { return _truth(model, succState, json.nec); });
+      if (L.length === 0) return true;
+      else return L[0].every(function (succState) { return _truth(model, succState, json.nec); }); 
+      //ici L est un array qui contient un array, donc je passe par L[0]. Ce comportement semble issu de l'utilisation de Array.from, mais sans passer par la, le résultat de getSuccessorsOfOld n'est pas iterable.
     }
     else if (json.poss){
       var L = Array.from(model.getSuccessorsOfOld(state));
-      return L.some(function (succState) { return _truth(model, succState, json.poss); });
+      if (L.length === 0) return true;
+      else return L[0].some(function (succState) { return _truth(model, succState, json.poss); });
     }
     else if (json.know){
-      //todo : reflexivite
-      var a = model.getSuccessorsOf(state, json.know[0].prop);
-      if (a === undefined){ return true;}
-      else return model.getSuccessorsOf(state, json.know[0].prop).every(function (succState) { return _truth(model, succState, json.know[1]); });
+      var A = model.getSuccessorsOf(state, json.know[0].prop);
+      if (A === undefined){ return true;}
+      else return A.every(function (succState) { return _truth(model, succState, json.know[1]); });
     }
     else if (json.group){
       var g = json.group;
@@ -457,15 +465,16 @@ var MPL = (function (FormulaParser) {
     else if (json.distrib){
       var L = _truth(model, state, json.distrib[0]);
       if (L instanceof Array) {
-       var A = [];
-       L.forEach(function (agent) {A.push(model.getSuccessorsOf(state, agent.prop));});
-       //TODO: En fait il faut que ca se propage dans tous les chemins non ?
-       console.log(A);
-       if (A.includes(undefined)) {var B = undefined;}
-       else {var B = A[0];
-        A.forEach(function (array) {B.filter(x => array.includes(x));});}
-       if (B === undefined) {return true;} //Todo: Reflexivite
-       else {return B.every(function (state) {return _truth(model, state, json.distrib[1]);});}
+        var A = model.gAccessStrict(state, L);
+        return A.every(function (state) {return _truth(model, state, json.distrib[1]);});
+       //var A = [];
+       //L.forEach(function (agent) {A.push(model.getSuccessorsOf(state, agent.prop));});
+       //console.log(A);
+       //if (A.includes(undefined)) {var B = undefined;}
+       //else {var B = A[0];
+        //A.forEach(function (array) {B.filter(x => array.includes(x));});}
+       //if (B === undefined) {return true;}
+       //else {return B.every(function (state) {return _truth(model, state, json.distrib[1]);});}
       }
       else return undefined;
     }

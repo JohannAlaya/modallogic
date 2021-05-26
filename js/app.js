@@ -629,10 +629,13 @@ function keydown() {
         // toggle node reflexivity
         if(selected_node.reflexive) {
           selected_node.reflexive = false;
-          model.removeTransition(selected_node.id, selected_node.id);
+          var agentList = model.getAllAgents();
+          model.removeTransition(selected_node.id, selected_node.id, agentList);
         } else {
-          selected_node.reflexive = true;
-          model.addTransition(selected_node.id, selected_node.id);
+          var newAgents =prompt("Pour quels agents ce noeud est il reflexif ? (sans espaces, séparés par une virgule, ex: a,b,c)", "");
+          var agentList = newAgents.split(',');
+          if(agentList.length !==0) {selected_node.reflexive = true;
+          model.addTransition(selected_node.id, selected_node.id, agentList);}
         }
       } else if(selected_link) {
         var sourceId = selected_link.source.id,
