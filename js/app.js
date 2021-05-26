@@ -341,7 +341,9 @@ function restart() {
 
   // add new links TODO: Ajouter les agents au dessus de la fleche des liens
 
-  path.enter().append('svg:path')
+  var g2 = path.enter().append('svg:g');
+  
+    path.enter().append('svg:path')
     .attr('class', 'link')
     .classed('selected', function(d) { return d === selected_link; })
     .style('marker-start', function(d) { return d.left ? 'url(#start-arrow)' : ''; })
@@ -356,11 +358,12 @@ function restart() {
       setSelectedNode(null);
       restart();
     });
-  
-  path.append('svg:text')
-  .attr('x', 0)
-  .attr('y', 4)
-  .text("test");
+
+    g2.append('svg:text')
+    .attr('x', function(d) {return ((d.source.x + d.target.x) / 2) + 10})
+    .attr('y', function(d) {return (d.source.y + d.target.y) / 2})
+    .attr('class', 'id')
+    .text(function(d) {var s ='';d.agent.forEach(function(a){s=s+a+" "});return s;});
 
   // remove old links
   path.exit().remove();
@@ -425,7 +428,7 @@ function restart() {
       // unenlarge target node
       d3.select(this).attr('transform', '');
 
-      // ask for agent TODO: le faire de maniere plus elegante
+      // ask for agents
       var newAgents = prompt("Quel sont les agents associés à cette transition ? (sans espaces, séparés par une virgule, ex: a,b,c)", "");
       var agentList = newAgents.split(',')
       // add transition to model
@@ -433,7 +436,6 @@ function restart() {
 
       // add link to graph (update if exists)
       // note: links are strictly source < target; arrows separately specified by booleans
-      // TODO : Changer cette partie pour que l'ajout de nouveaux liens demande un agent DONE?
       var source, target, direction;
       if(mousedown_node.id < mouseup_node.id) {
         source = mousedown_node;
