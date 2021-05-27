@@ -24,7 +24,8 @@ var model = new MPL.Model(),
 var modelParam = window.location.search.match(/\?model=(.*)/);
 if(modelParam) modelString = modelParam[1];
 
-//TODO : Finir le regex pour que cette partie ne bloque pas l'app
+//Etant donné que je n'ai pas eu le temps d'adapter le chargeur de sauvegarde, cette partie bloque le site si
+//elle est décommentée.
 // model.loadFromModelString(modelString);
 
 // set up initial nodes and links (edges) of graph, based on MPL model
@@ -65,7 +66,6 @@ nodes.forEach(function(source) {
       var target = nodes.filter(function(node) { return node.id === targetId; })[0]; /*Getting the target node*/
   
       if(sourceId < targetId) {
-        //TODO: Ajouter un test pour vérifier les duplicatas d'agents//
         links.push({source: source, target: target, left: false, right: true, agent: agent }); /*Added agent
         in the values of the link */
         return;
@@ -339,7 +339,7 @@ function restart() {
     .style('marker-start', function(d) { return d.left ? 'url(#start-arrow)' : ''; })
     .style('marker-end', function(d) { return d.right ? 'url(#end-arrow)' : ''; });
 
-  // add new links TODO: Ajouter les agents au dessus de la fleche des liens
+  // add new links 
 
   var g2 = path.enter().append('svg:g');
   
@@ -361,7 +361,7 @@ function restart() {
 
     g2.append('svg:text')
     .attr('x', function(d) {return ((d.source.x + d.target.x) / 2) + 10})
-    .attr('y', function(d) {return (d.source.y + d.target.y) / 2})
+    .attr('y', function(d) {return ((d.source.y + d.target.y) / 2) + 4})
     .attr('class', 'id')
     .text(function(d) {var s ='';d.agent.forEach(function(a){s=s+a+" "});return s;});
 

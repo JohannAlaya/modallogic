@@ -368,7 +368,7 @@ var MPL = (function (FormulaParser) {
     /**
      * Restores a model from a given model string.
      
-     TODO: Finir de changer la restauration depuis un string*/
+     Cette partie n'a pas été adaptée aux fonctionalités de logique épistémique par manque de temps. */
     this.loadFromModelString = function (modelString) {
       var regex = /^(?:;|(?:A|A(?:\w+,)*\w+)(?:S|S(?:\d+,)*\d+);)+$/;
       if (!regex.test(modelString)) return;
@@ -401,7 +401,6 @@ var MPL = (function (FormulaParser) {
       // restore transitions
       successorLists.forEach(function (successors, source) {
         if (!successors) return;
-        /*TODO: Ajouter un foreach sur les agents*/
         successors.forEach(function (target) {
           self.addTransition(source, target, agent);
         });
@@ -440,7 +439,7 @@ var MPL = (function (FormulaParser) {
     }
     else if (json.know){
       var A = model.getSuccessorsOf(state, json.know[0].prop);
-      if (A === undefined){ return true;}
+      if (typeof A === "undefined"){ return true;}
       else return A.every(function (succState) { return _truth(model, succState, json.know[1]); });
     }
     else if (json.group){
